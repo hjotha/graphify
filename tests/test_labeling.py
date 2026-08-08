@@ -410,13 +410,22 @@ def test_label_communities_runs_batches_concurrently(monkeypatch):
 
 
 def test_label_communities_forces_serial_for_ollama(monkeypatch):
-    """ollama/claude-cli must stay serial regardless of --max-concurrency."""
+    """Ollama must stay serial regardless of --max-concurrency."""
     G, communities = _many_communities(8)
     fake_batch, state = _peak_tracker()
     monkeypatch.setattr("graphify.llm._label_batch_with_retry", fake_batch)
     monkeypatch.delenv("GRAPHIFY_OLLAMA_PARALLEL", raising=False)
     label_communities(G, communities, backend="ollama", batch_size=1, max_concurrency=8)
     assert state["peak"] == 1, "ollama must be forced serial"
+
+
+def test_label_communities_forces_serial_for_codex_cli(monkeypatch):
+    G, communities = _many_communities(8)
+    fake_batch, state = _peak_tracker()
+    monkeypatch.setattr("graphify.llm._label_batch_with_retry", fake_batch)
+    monkeypatch.delenv("GRAPHIFY_CODEX_CLI_PARALLEL", raising=False)
+    label_communities(G, communities, backend="codex-cli", batch_size=1, max_concurrency=8)
+    assert state["peak"] == 1, "codex-cli must be forced serial"
 
 
 def test_label_communities_salvages_truncated_reply(monkeypatch):

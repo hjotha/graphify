@@ -578,6 +578,8 @@ def _resolve_triage_backend() -> tuple[str, str]:
             return b, model
 
     import shutil
+    if shutil.which("codex"):
+        return "codex-cli", _default_model_for_backend("codex-cli")
     if shutil.which("claude"):
         return "claude-cli", "claude-code-plan"
 
@@ -651,26 +653,11 @@ def triage_with_opus(prs: list[PRInfo], base: str) -> None:
                         print(delta.replace("\n", "\n  "), end="", flush=True)
             print("\n")
 
-        elif backend == "claude-cli":
-            import platform as _platform, shutil as _shutil, subprocess as _sp
-            _claude = "claude"
-            if _platform.system() == "Windows":
-                _claude = _shutil.which("claude.cmd") or _shutil.which("claude") or "claude"
-            proc = _sp.run(
-                [_claude, "-p", "--no-session-persistence"],
-                input=prompt, capture_output=True, text=True,
-                encoding="utf-8", errors="replace", timeout=120,
-            )
-            if proc.returncode != 0:
-                print(red(f"  claude -p failed: {proc.stderr.strip()[:300]}"), file=sys.stderr)
-            else:
-                try:
-                    result = json.loads(proc.stdout).get("result") or proc.stdout
-                except json.JSONDecodeError:
-                    result = proc.stdout
-                for line in result.splitlines():
-                    print(f"  {line}")
-                print()
+        elif backend in ("claude-cli", "codex-cli"):
+            from graphify.llm import _call_llm
+            for line in _call_llm(prompt, backend=backend, model=model, max_tokens=1024).splitlines():
+                print(f"  {line}")
+            print()
 
     except Exception as e:
         print(f"\n\n  {red(f'Triage failed: {e}')}", file=sys.stderr)

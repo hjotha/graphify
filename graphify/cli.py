@@ -3176,6 +3176,16 @@ def dispatch_command(cmd: str) -> None:
                             file=sys.stderr,
                         )
                         sys.exit(1)
+                elif backend == "codex-cli":
+                    import shutil as _shutil
+                    allow_no_key = _shutil.which("codex") is not None
+                    if not allow_no_key:
+                        print(
+                            "error: backend 'codex-cli' requires the `codex` CLI on $PATH "
+                            "(install Codex and run `codex` once to authenticate).",
+                            file=sys.stderr,
+                        )
+                        sys.exit(1)
                 if not allow_no_key:
                     print(
                         f"error: backend '{backend}' requires {_format_backend_env_keys(backend)} to be set.",

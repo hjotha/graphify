@@ -517,7 +517,9 @@ These are only needed for **headless / CI extraction** (`graphify extract`). Whe
 | `AWS_*` / `~/.aws/credentials` | AWS Bedrock — standard credential chain | `--backend bedrock` (no API key, uses IAM) |
 | `GRAPHIFY_MAX_WORKERS` | AST parallelism thread count | optional — also `--max-workers` flag |
 | `GRAPHIFY_MAX_OUTPUT_TOKENS` | Raise output cap for dense corpora | optional — e.g. `32768` for large files |
-| `GRAPHIFY_API_TIMEOUT` | Per-call timeout in seconds for HTTP, claude-cli, Anthropic SDK, and Bedrock backends (default: 600) | optional — also `--api-timeout` flag |
+| `GRAPHIFY_API_TIMEOUT` | Per-call timeout in seconds for HTTP, CLI, Anthropic SDK, and Bedrock backends (default: 600) | optional — also `--api-timeout` flag |
+| `GRAPHIFY_CODEX_CLI_MODEL` | Model used by the `codex-cli` backend (default: `gpt-5.3-codex-spark`) | optional |
+| `GRAPHIFY_CODEX_CLI_EFFORT` | Codex reasoning effort: minimal, low, medium, high, or xhigh (default: xhigh) | optional |
 | `GRAPHIFY_MAX_RETRIES` | How many times to retry a rate-limited (429) request before giving up (default: 6; honors `Retry-After`) | optional — raise for strict per-org limits (e.g. kimi); `0` disables |
 | `GRAPHIFY_FORCE` | Force graph rebuild even with fewer nodes | optional — also `--force` flag |
 | `GRAPHIFY_GOOGLE_WORKSPACE` | Auto-enable Google Workspace export | optional — set to `1` |
@@ -720,7 +722,7 @@ graphify antigravity install       # .agents/rules + .agents/workflows (Google A
 graphify antigravity uninstall
 
 graphify extract ./docs                        # headless LLM extraction for CI (no IDE needed)
-graphify extract ./docs --backend gemini       # explicit backend: gemini, kimi, claude, openai, deepseek, ollama, bedrock, or claude-cli
+graphify extract ./docs --backend gemini       # explicit backend: gemini, kimi, claude, openai, deepseek, ollama, bedrock, claude-cli, or codex-cli
 graphify extract ./docs --backend gemini --model gemini-3.1-pro-preview
 graphify extract ./docs --backend ollama       # local Ollama (set OLLAMA_BASE_URL / OLLAMA_MODEL) - no API key needed for loopback
 OPENAI_BASE_URL=http://localhost:8080/v1 OPENAI_MODEL=my-model graphify extract ./docs --backend openai   # any OpenAI-compatible server (llama.cpp, vLLM, LM Studio)
@@ -729,6 +731,7 @@ GRAPHIFY_OLLAMA_NUM_CTX=32768 graphify extract ./docs --backend ollama   # overr
 GRAPHIFY_OLLAMA_KEEP_ALIVE=0 graphify extract ./docs --backend ollama    # unload model after each chunk (saves VRAM on small GPUs)
 graphify extract ./docs --backend bedrock      # AWS Bedrock via IAM - no API key, uses AWS credential chain
 graphify extract ./docs --backend claude-cli   # route through Claude Code CLI - no API key, uses your Claude subscription
+graphify extract ./docs --backend codex-cli    # route through Codex CLI - no API key, defaults to Spark/xhigh
 graphify extract ./docs --backend azure        # Azure OpenAI (set AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT)
 graphify extract ./docs --max-workers 16       # AST parallelism (also GRAPHIFY_MAX_WORKERS)
 graphify extract --postgres "postgresql://user:pass@host/db"   # introspect live PostgreSQL schema directly
