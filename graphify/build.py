@@ -569,6 +569,61 @@ def dedupe_edges(edges: list[dict]) -> list[dict]:
     return out
 
 
+def collapse_ast_semantic_ghosts(
+    nodes: list[dict], edges: list[dict], hyperedges: list[dict] | None = None
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Match the safe AST-vs-semantic collapse performed by ``build_from_json``.
+
+    Raw ``--no-cluster`` output bypasses NetworkX, so semantic nodes that share
+    an exact ``(source_file, label)`` with one AST node otherwise survive until
+    ``cluster-only`` and trigger its shrink guard. Ambiguous AST keys are left
+    untouched.
+    """
+    ast_by_key: dict[tuple[str, str], str] = {}
+    ambiguous: set[tuple[str, str]] = set()
+    for node in nodes:
+        if node.get("_origin") != "ast":
+            continue
+        key = (str(node.get("source_file") or ""), str(node.get("label") or "").strip())
+        if not all(key):
+            continue
+        if key in ast_by_key and ast_by_key[key] != node.get("id"):
+            ambiguous.add(key)
+        else:
+            ast_by_key[key] = node.get("id")
+
+    remap: dict[str, str] = {}
+    for node in nodes:
+        if node.get("_origin") == "ast":
+            continue
+        key = (str(node.get("source_file") or ""), str(node.get("label") or "").strip())
+        canonical = ast_by_key.get(key)
+        if canonical and key not in ambiguous and node.get("id") != canonical:
+            remap[node["id"]] = canonical
+
+    if not remap:
+        return nodes, edges, list(hyperedges or [])
+
+    kept_nodes = [node for node in nodes if node.get("id") not in remap]
+    rewired_edges = []
+    for edge in edges:
+        edge = dict(edge)
+        for key in ("source", "target", "from", "to"):
+            if edge.get(key) in remap:
+                edge[key] = remap[edge[key]]
+        rewired_edges.append(edge)
+
+    rewired_hyperedges = []
+    for hyperedge in hyperedges or []:
+        hyperedge = dict(hyperedge)
+        for key in ("nodes", "members", "node_ids"):
+            if isinstance(hyperedge.get(key), list):
+                members = _coerce_hyperedge_member_refs(hyperedge, hyperedge[key])
+                hyperedge[key] = list(dict.fromkeys(remap.get(node, node) for node in members))
+        rewired_hyperedges.append(hyperedge)
+    return kept_nodes, rewired_edges, rewired_hyperedges
+
+
 def _old_file_stems(rel: Path) -> list[str]:
     """Pre-migration stem forms a semantic fragment may have used for ``rel``.
 

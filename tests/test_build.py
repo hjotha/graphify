@@ -2,7 +2,16 @@ import json
 from pathlib import Path
 import networkx as nx
 from networkx.readwrite import json_graph
-from graphify.build import build_from_json, build, build_merge, edge_data, edge_datas, dedupe_edges, dedupe_nodes
+from graphify.build import (
+    build_from_json,
+    build,
+    build_merge,
+    collapse_ast_semantic_ghosts,
+    edge_data,
+    edge_datas,
+    dedupe_edges,
+    dedupe_nodes,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -46,6 +55,24 @@ def test_dedupe_nodes_collapses_by_id_last_wins():
     assert ids == ["foundation", "akit"]  # first-appearance order
     # last writer wins on attributes
     assert next(n for n in out if n["id"] == "foundation")["source_file"] == "B.swift"
+
+
+def test_collapse_ast_semantic_ghosts_rewires_only_unambiguous_twins():
+    nodes = [
+        {"id": "ast", "label": "Accounts Table", "source_file": "overview.md", "_origin": "ast"},
+        {"id": "ghost", "label": "Accounts Table", "source_file": "overview.md", "_origin": "semantic"},
+        {"id": "ast_a", "label": "Duplicate", "source_file": "same.py", "_origin": "ast"},
+        {"id": "ast_b", "label": "Duplicate", "source_file": "same.py", "_origin": "ast"},
+        {"id": "ambiguous", "label": "Duplicate", "source_file": "same.py", "_origin": "semantic"},
+    ]
+    edges = [{"source": "ghost", "target": "ast_a", "relation": "references"}]
+    hyperedges = [{"id": "h", "nodes": ["ghost", "ast", "ambiguous"]}]
+
+    out_nodes, out_edges, out_hyperedges = collapse_ast_semantic_ghosts(nodes, edges, hyperedges)
+
+    assert {node["id"] for node in out_nodes} == {"ast", "ast_a", "ast_b", "ambiguous"}
+    assert out_edges[0]["source"] == "ast"
+    assert out_hyperedges[0]["nodes"] == ["ast", "ambiguous"]
 
 def load_extraction():
     return json.loads((FIXTURES / "extraction.json").read_text())

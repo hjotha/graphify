@@ -1379,11 +1379,21 @@ def _rebuild_code(
             # Dedupe parallel edges (the clustered path's DiGraph collapses them implicitly);
             # without it, --no-cluster + repeated `update` accumulate duplicates and edge
             # counts diverge across build modes (#1317).
-            from graphify.build import dedupe_edges as _dedupe_edges, dedupe_nodes as _dedupe_nodes
+            from graphify.build import (
+                collapse_ast_semantic_ghosts as _collapse_ast_semantic_ghosts,
+                dedupe_edges as _dedupe_edges,
+                dedupe_nodes as _dedupe_nodes,
+            )
+            _nodes, _edges, _hyperedges = _collapse_ast_semantic_ghosts(
+                _dedupe_nodes(result.get("nodes", [])),
+                result.get("edges", []),
+                result.get("hyperedges"),
+            )
             candidate_graph_data = {
                 **{k: v for k, v in result.items() if k not in ("edges", "nodes")},
-                "nodes": _dedupe_nodes(result.get("nodes", [])),
-                "links": _dedupe_edges(result.get("edges", [])),
+                "nodes": _nodes,
+                "links": _dedupe_edges(_edges),
+                "hyperedges": _hyperedges,
                 # Inherit the existing graph's directed flag (#2342) so
                 # `graphify update --no-cluster` can't silently drop it -
                 # `result` (the raw merged extraction) never carries one.

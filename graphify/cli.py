@@ -3583,7 +3583,11 @@ def dispatch_command(cmd: str) -> None:
             # clustered path (whose DiGraph collapses both) and stays deterministic
             # across modes (#1317; node dedup also collapses shared Swift module
             # anchors emitted per importing file, #1327).
-            from graphify.build import dedupe_edges as _dedupe_edges, dedupe_nodes as _dedupe_nodes
+            from graphify.build import (
+                collapse_ast_semantic_ghosts as _collapse_ast_semantic_ghosts,
+                dedupe_edges as _dedupe_edges,
+                dedupe_nodes as _dedupe_nodes,
+            )
             from graphify.export import (
                 backup_if_protected as _backup,
                 existing_graph_node_count as _existing_graph_node_count,
@@ -3651,6 +3655,9 @@ def dispatch_command(cmd: str) -> None:
                     print(f"error: {exc}", file=sys.stderr)
                     sys.exit(1)
             merged["nodes"] = _dedupe_nodes(merged["nodes"])
+            merged["nodes"], merged["edges"], merged["hyperedges"] = _collapse_ast_semantic_ghosts(
+                merged["nodes"], merged["edges"], merged.get("hyperedges")
+            )
             merged["edges"] = _dedupe_edges(merged["edges"])
             # Disambiguate colliding-basename file-node labels (#2032). This raw
             # --no-cluster path bypasses build_from_json (where the clustered path
