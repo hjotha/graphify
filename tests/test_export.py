@@ -782,6 +782,24 @@ def test_to_json_refuses_shrink(tmp_path):
     assert to_json(_mkG(2), {}, str(p), force=True) is True  # force overrides
 
 
+def test_to_json_allows_safe_ast_semantic_ghost_cleanup(tmp_path):
+    p = tmp_path / "graph.json"
+    json.dump(
+        {
+            "nodes": [
+                {"id": "ast", "label": "Thing", "source_file": "a.py", "_origin": "ast"},
+                {"id": "semantic", "label": "Thing", "source_file": "a.py", "_origin": "semantic"},
+            ],
+            "links": [],
+        },
+        p.open("w"),
+    )
+    graph = _mkG(0)
+    graph.add_node("ast", label="Thing", source_file="a.py", _origin="ast", community=0)
+    assert to_json(graph, {}, str(p), force=False) is True
+    assert [node["id"] for node in json.loads(p.read_text())["nodes"]] == ["ast"]
+
+
 def test_to_json_fails_safe_on_corrupt_existing(tmp_path):
     """A non-empty but unparseable existing graph.json (corrupt or mid-write)
     must NOT be silently overwritten — we can't verify the new graph isn't a
