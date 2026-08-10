@@ -2000,6 +2000,18 @@ def test_detect_incremental_portable_across_paths(tmp_path):
     )
 
 
+def test_detect_memory_respects_explicit_graphifyignore(tmp_path):
+    memory = tmp_path / "graphify-out" / "memory"
+    memory.mkdir(parents=True)
+    result = memory / "result.md"
+    result.write_text("query result\n")
+
+    assert str(result) in detect(tmp_path)["files"]["document"]
+    (tmp_path / ".graphifyignore").write_text("graphify-out/\n")
+
+    assert str(result) not in detect(tmp_path)["files"]["document"]
+
+
 def _rewrite_manifest_keys_nfd(manifest_path):
     """Rewrite a saved manifest so every key is in NFD form, simulating a
     manifest written by a macOS run where os.walk/getcwd yielded decomposed

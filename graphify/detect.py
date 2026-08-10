@@ -1345,10 +1345,12 @@ def detect(root: Path, *, follow_symlinks: bool | None = None, google_workspace:
             if line:
                 ignore_patterns.append((root, line))
 
-    # Always include graphify-out/memory/ - query results filed back into the graph
+    # Include query results unless the project explicitly opts out.
     memory_dir = root / GRAPHIFY_OUT / "memory"
     scan_paths = [root]
-    if memory_dir.exists():
+    if memory_dir.exists() and not _is_ignored(
+        memory_dir, root, ignore_patterns, _cache=ignore_cache
+    ):
         scan_paths.append(memory_dir)
 
     seen: set[Path] = set()
