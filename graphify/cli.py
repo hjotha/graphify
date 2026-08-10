@@ -3538,7 +3538,10 @@ def dispatch_command(cmd: str) -> None:
         # Path normalization against the scan root happens inside the helper
         # (#1897) so fresh root-relative source_files match detect()'s
         # absolute file lists.
-        _manifest_files = _stamped_manifest_files(files_by_type, sem_result, target,
+        _manifest_files = _stamped_manifest_files(
+            detection.get("new_files", {}) if incremental_mode else files_by_type,
+            sem_result,
+            target,
                                                    partial_source_files=_partial_semantic_files)
 
         # Files dispatched this run but dropped by _stamped_manifest_files

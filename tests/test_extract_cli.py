@@ -623,6 +623,31 @@ def test_extract_force_flag_redispatches_and_stamps_manifest(monkeypatch, tmp_pa
     assert manifest.get("main.go", {}).get("semantic_hash")
 
 
+def test_incremental_extract_does_not_rewrite_unchanged_mtimes(monkeypatch, tmp_path):
+    """A portable manifest must not churn when the checkout mtimes differ."""
+    import json
+    import os
+
+    corpus = _make_corpus(tmp_path)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-fake-key")
+    monkeypatch.setattr(
+        "graphify.llm.extract_corpus_parallel", _recording_extractor([])
+    )
+    monkeypatch.setattr(mainmod, "_check_skill_version", lambda _: None)
+    args = ["graphify", "extract", str(corpus), "--backend", "claude", "--no-cluster"]
+
+    _run_extract(monkeypatch, args)
+    manifest_path = corpus / "graphify-out" / "manifest.json"
+    before = json.loads(manifest_path.read_text())
+    for path in (corpus / "main.go", corpus / "README.md"):
+        stat = path.stat()
+        os.utime(path, (stat.st_atime, stat.st_mtime + 10))
+
+    _run_extract(monkeypatch, args)
+
+    assert json.loads(manifest_path.read_text()) == before
+
+
 def test_extract_graphify_force_env_redispatches(monkeypatch, tmp_path):
     """GRAPHIFY_FORCE=1 behaves like --force (env parity with `update`)."""
     corpus = _make_corpus(tmp_path)
