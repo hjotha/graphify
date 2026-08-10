@@ -318,3 +318,102 @@ def remap_communities_to_previous(
     for new_cid, nodes in communities.items():
         remapped[new_to_final[new_cid]] = sorted(nodes)
     return dict(sorted(remapped.items(), key=lambda kv: kv[0]))
+
+
+_INCREMENTAL_NODE_IGNORED_ATTRS = {"id", "community", "x", "y"}
+_INCREMENTAL_EDGE_IGNORED_ATTRS = {
+    "source", "target", "_src", "_tgt", "community", "x", "y",
+}
+
+
+def _incremental_signature(attrs: dict, ignored: set[str]) -> str:
+    return json.dumps(
+        {key: value for key, value in attrs.items() if key not in ignored},
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        default=str,
+    )
+
+
+def _incremental_edge_map(G: nx.Graph) -> dict[tuple[str, str, str], tuple[object, object]]:
+    rows: dict[tuple[str, str, str], tuple[object, object]] = {}
+    for source, target, attrs in G.edges(data=True):
+        if not G.is_directed() and str(target) < str(source):
+            source, target = target, source
+        rows[(
+            str(source),
+            str(target),
+            _incremental_signature(attrs, _INCREMENTAL_EDGE_IGNORED_ATTRS),
+        )] = (source, target)
+    return rows
+
+
+def stable_incremental_communities(
+    old_graph: nx.Graph,
+    new_graph: nx.Graph,
+    previous_node_community: dict[object, int],
+    cluster_fn=cluster,
+) -> dict[int, list[object]]:
+    """Recluster only previous communities touched by a graph change."""
+    if not previous_node_community:
+        return cluster_fn(new_graph)
+
+    old_nodes = set(old_graph.nodes)
+    new_nodes = set(new_graph.nodes)
+    changed = old_nodes ^ new_nodes
+    for node in old_nodes & new_nodes:
+        if _incremental_signature(
+            old_graph.nodes[node], _INCREMENTAL_NODE_IGNORED_ATTRS
+        ) != _incremental_signature(
+            new_graph.nodes[node], _INCREMENTAL_NODE_IGNORED_ATTRS
+        ):
+            changed.add(node)
+    old_edges = _incremental_edge_map(old_graph)
+    new_edges = _incremental_edge_map(new_graph)
+    for key in old_edges.keys() ^ new_edges.keys():
+        changed.update(old_edges.get(key) or new_edges[key])
+
+    affected_ids = {
+        previous_node_community[node]
+        for node in changed
+        if node in previous_node_community
+    }
+    affected_nodes = {
+        node
+        for node in new_graph.nodes
+        if node not in previous_node_community
+        or previous_node_community[node] in affected_ids
+    }
+    result: dict[int, list[object]] = {}
+    for node, community_id in previous_node_community.items():
+        if node in new_graph and community_id not in affected_ids:
+            result.setdefault(community_id, []).append(node)
+
+    if affected_nodes:
+        local = cluster_fn(new_graph.subgraph(affected_nodes).copy())
+        local = remap_communities_to_previous(
+            local,
+            {
+                node: previous_node_community[node]
+                for node in affected_nodes
+                if node in previous_node_community
+            },
+        )
+        next_id = max([-1, *previous_node_community.values(), *result.keys()]) + 1
+        for community_id, nodes in sorted(local.items()):
+            target_id = community_id
+            if target_id in result:
+                while next_id in result:
+                    next_id += 1
+                target_id = next_id
+                next_id += 1
+            result[target_id] = list(nodes)
+
+    covered = {node for nodes in result.values() for node in nodes}
+    if covered != new_nodes:
+        raise ValueError("incremental community coverage mismatch")
+    return {
+        community_id: sorted(nodes, key=str)
+        for community_id, nodes in sorted(result.items())
+    }

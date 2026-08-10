@@ -3,7 +3,13 @@ import sys
 import networkx as nx
 from pathlib import Path
 from graphify.build import build_from_json
-from graphify.cluster import cluster, cohesion_score, remap_communities_to_previous, score_all
+from graphify.cluster import (
+    cluster,
+    cohesion_score,
+    remap_communities_to_previous,
+    score_all,
+    stable_incremental_communities,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -98,3 +104,26 @@ def test_remap_communities_to_previous_assigns_deterministic_new_ids():
     assert list(remapped.keys()) == [0, 1]
     assert remapped[0] == ["x", "y", "z"]
     assert remapped[1] == ["m"]
+
+
+def test_stable_incremental_communities_preserves_untouched_community():
+    old = nx.Graph()
+    old.add_edges_from([("a", "b"), ("x", "y")])
+    new = old.copy()
+    new.add_edge("b", "c")
+    seen = []
+
+    def local_cluster(graph):
+        seen.append(set(graph.nodes))
+        return {0: list(graph.nodes)}
+
+    communities = stable_incremental_communities(
+        old,
+        new,
+        {"a": 4, "b": 4, "x": 9, "y": 9},
+        cluster_fn=local_cluster,
+    )
+
+    assert seen == [{"a", "b", "c"}]
+    assert communities[9] == ["x", "y"]
+    assert set(communities[4]) == {"a", "b", "c"}

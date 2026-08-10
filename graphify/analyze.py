@@ -113,7 +113,14 @@ def god_nodes(G: nx.Graph, top_n: int = 10) -> list[dict]:
     mechanically and don't represent meaningful architectural abstractions.
     """
     degree = dict(G.degree())
-    sorted_nodes = sorted(degree.items(), key=lambda x: x[1], reverse=True)
+    sorted_nodes = sorted(
+        degree.items(),
+        key=lambda x: (
+            -x[1],
+            str(G.nodes[x[0]].get("source_file", "")).lower().endswith(".json"),
+            str(x[0]),
+        ),
+    )
     result = []
     for node_id, deg in sorted_nodes:
         if _is_file_node(G, node_id) or _is_concept_node(G, node_id) or _is_json_key_node(G, node_id):
@@ -327,7 +334,13 @@ def _cross_file_surprises(G: nx.Graph, communities: dict[int, list[str]], top_n:
             "why": "; ".join(reasons) if reasons else "cross-file semantic connection",
         })
 
-    candidates.sort(key=lambda x: x["_score"], reverse=True)
+    candidates.sort(key=lambda x: (
+        -x["_score"],
+        str(x["source"]),
+        str(x["target"]),
+        str(x["relation"]),
+        tuple(map(str, x["source_files"])),
+    ))
     for c in candidates:
         c.pop("_score")
 
@@ -356,7 +369,10 @@ def _cross_community_surprises(
         if G.number_of_nodes() > 5000:
             return []
         betweenness = nx.edge_betweenness_centrality(G)
-        top_edges = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)[:top_n]
+        top_edges = sorted(
+            betweenness.items(),
+            key=lambda x: (-x[1], str(x[0][0]), str(x[0][1])),
+        )[:top_n]
         result = []
         for (u, v), score in top_edges:
             data = edge_data(G, u, v)
@@ -411,7 +427,13 @@ def _cross_community_surprises(
 
     # Sort: AMBIGUOUS first, then INFERRED, then EXTRACTED
     order = {"AMBIGUOUS": 0, "INFERRED": 1, "EXTRACTED": 2}
-    surprises.sort(key=lambda x: order.get(x["confidence"], 3))
+    surprises.sort(key=lambda x: (
+        order.get(x["confidence"], 3),
+        str(x["source"]),
+        str(x["target"]),
+        str(x["relation"]),
+        tuple(map(str, x["source_files"])),
+    ))
 
     # Deduplicate by community pair - one representative edge per (A→B) boundary.
     # Without this, a single high-betweenness god node dominates all results.

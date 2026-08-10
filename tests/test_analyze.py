@@ -29,6 +29,15 @@ def test_god_nodes_sorted_by_degree():
     assert degrees == sorted(degrees, reverse=True)
 
 
+def test_god_nodes_break_degree_ties_by_id():
+    G = nx.Graph()
+    for node in reversed(["a", "b", "c"]):
+        G.add_node(node, label=node, source_file=f"src/{node}.py")
+    G.add_edges_from([("a", "b"), ("b", "c"), ("c", "a")])
+
+    assert [row["id"] for row in god_nodes(G)] == ["a", "b", "c"]
+
+
 def test_god_nodes_have_required_keys():
     G = make_graph()
     result = god_nodes(G, top_n=1)
@@ -104,6 +113,36 @@ def test_surprising_connections_ambiguous_scores_higher_than_extracted():
     score_amb, _ = _surprise_score(G, "a", "b", G.edges["a", "b"], nc, "repo1/model.py", "repo2/train.py")
     score_ext, _ = _surprise_score(G, "c", "d", G.edges["c", "d"], nc, "repo1/data.py", "repo2/eval.py")
     assert score_amb > score_ext
+
+
+def test_surprising_connections_break_score_ties_deterministically():
+    nodes = [
+        ("a", "Alpha", "one/a.py"),
+        ("b", "Beta", "two/b.py"),
+        ("c", "Charlie", "one/c.py"),
+        ("d", "Delta", "two/d.py"),
+    ]
+    edges = [("a", "b"), ("c", "d")]
+
+    def build(reverse=False):
+        graph = nx.Graph()
+        for node, label, source in reversed(nodes) if reverse else nodes:
+            graph.add_node(node, label=label, source_file=source, file_type="code")
+        for source, target in reversed(edges) if reverse else edges:
+            graph.add_edge(
+                source,
+                target,
+                relation="calls",
+                confidence="EXTRACTED",
+                _src=source,
+                _tgt=target,
+            )
+        return graph
+
+    communities = {0: ["a", "c"], 1: ["b", "d"]}
+    assert surprising_connections(build(), communities) == surprising_connections(
+        build(reverse=True), communities
+    )
 
 
 def test_surprise_score_accepts_precomputed_degrees():

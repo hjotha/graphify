@@ -3758,7 +3758,16 @@ def dispatch_command(cmd: str) -> None:
         from graphify.export import to_json as _to_json
         from graphify.analyze import god_nodes as _god_nodes, surprising_connections as _surprising
         dedup_backend = backend if dedup_llm else None
+        _previous_graph = None
+        _previous_node_community = {}
         if incremental_mode:
+            from graphify.paths import load_node_link_graph as _load_node_link_graph
+            _previous_graph = _load_node_link_graph(existing_graph_path)
+            _previous_node_community = {
+                node: int(attrs["community"])
+                for node, attrs in _previous_graph.nodes(data=True)
+                if attrs.get("community") is not None
+            }
             # Prune everything the current scan no longer covers: genuinely
             # deleted manifest rows, excluded-but-alive manifest rows (#1908),
             # and the graph's own stale sources — which catches files that
@@ -3787,7 +3796,24 @@ def dispatch_command(cmd: str) -> None:
             )
             sys.exit(1)
 
-        communities = _cluster(G, resolution=cli_resolution, exclude_hubs_percentile=cli_exclude_hubs)
+        if _previous_graph is not None:
+            from graphify.cluster import stable_incremental_communities as _stable_incremental
+            communities = _stable_incremental(
+                _previous_graph,
+                G,
+                _previous_node_community,
+                cluster_fn=lambda graph: _cluster(
+                    graph,
+                    resolution=cli_resolution,
+                    exclude_hubs_percentile=cli_exclude_hubs,
+                ),
+            )
+        else:
+            communities = _cluster(
+                G,
+                resolution=cli_resolution,
+                exclude_hubs_percentile=cli_exclude_hubs,
+            )
         stages.mark("cluster")
         cohesion = _score_all(G, communities)
         try:
@@ -3874,7 +3900,7 @@ def dispatch_command(cmd: str) -> None:
             },
         }
         from graphify.paths import write_json_atomic as _wja
-        _wja(analysis_path, analysis, indent=2)
+        _wja(analysis_path, analysis, indent=2, sort_keys=True)
         try:
             if has_path:
                 _save_manifest(_manifest_files, manifest_path=str(manifest_path), kind="both", root=target, scan_corpus=_scan_corpus, clear_semantic=_cleared_semantic)

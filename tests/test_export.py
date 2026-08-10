@@ -56,8 +56,20 @@ def test_to_json_is_byte_stable_across_insertion_order(tmp_path):
 
     def make_graph(reverse=False):
         graph = nx.Graph()
-        graph.add_nodes_from(reversed(nodes) if reverse else nodes)
-        graph.add_edges_from(reversed(links) if reverse else links)
+        selected_nodes = reversed(nodes) if reverse else nodes
+        selected_links = reversed(links) if reverse else links
+        graph.add_nodes_from(
+            (node, dict(reversed(list(attrs.items()))) if reverse else attrs)
+            for node, attrs in selected_nodes
+        )
+        graph.add_edges_from(
+            (
+                source,
+                target,
+                dict(reversed(list(attrs.items()))) if reverse else attrs,
+            )
+            for source, target, attrs in selected_links
+        )
         graph.graph["hyperedges"] = list(reversed(hyperedges)) if reverse else hyperedges
         return graph
 
