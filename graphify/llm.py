@@ -219,7 +219,7 @@ BACKENDS: dict[str, dict] = {
         # Routes through `codex exec` with the user's existing ChatGPT/Codex
         # subscription. Structured output is written to a temporary file and
         # parsed by the same validation/retry pipeline as API backends.
-        "default_model": "gpt-5.3-codex-spark",
+        "default_model": "gpt-5.6-luna",
         "model_env_key": "GRAPHIFY_CODEX_CLI_MODEL",
         "pricing": {"input": 0.0, "output": 0.0},
         "temperature": 0,
