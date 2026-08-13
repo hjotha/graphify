@@ -1,4 +1,6 @@
 import json
+import os
+import subprocess
 import sys
 import networkx as nx
 from pathlib import Path
@@ -80,6 +82,58 @@ def test_cluster_does_not_write_to_stderr(capsys):
     # Allow logging output (starts with [graphify]) but no raw ANSI codes
     for line in captured.err.splitlines():
         assert "\x1b" not in line, f"cluster() wrote ANSI to stderr: {line!r}"
+
+
+def test_cluster_is_stable_across_python_hash_seeds():
+    """Equivalent graphs must produce identical communities in fresh processes."""
+    script = r'''
+import json
+import random
+import networkx as nx
+
+from graphify.cluster import cluster
+
+rng = random.Random(11)
+base = nx.Graph()
+functions = [f"func:{file_id}:{func_id}" for file_id in range(35) for func_id in range(12)]
+
+for file_id in range(35):
+    file_node = f"file:{file_id}"
+    for func_id in range(12):
+        function = f"func:{file_id}:{func_id}"
+        base.add_edge(file_node, function)
+        for target in rng.sample(functions, 2):
+            base.add_edge(function, target)
+
+for hub_id in range(8):
+    hub = f"hub:{hub_id}"
+    for function in rng.sample(functions, 80):
+        base.add_edge(hub, function)
+
+included = set(base)
+base.add_nodes_from(f"junk:{index}" for index in range(1000))
+graph = base.subgraph(included)
+print(json.dumps(list(cluster(graph).values()), separators=(",", ":")))
+'''
+    outputs = []
+    repo_root = Path(__file__).parents[1]
+    for seed in ("1", "2"):
+        env = os.environ.copy()
+        env["PYTHONHASHSEED"] = seed
+        env["PYTHONPATH"] = os.pathsep.join(
+            path for path in (str(repo_root), *sys.path) if path
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=repo_root,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        outputs.append(result.stdout)
+
+    assert outputs[0] == outputs[1]
 
 
 def test_remap_communities_to_previous_reuses_old_ids():
