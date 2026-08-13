@@ -652,6 +652,11 @@ def _semantic_id_remap(nodes: list, root: str | None) -> dict:
     from graphify.extractors.base import _file_stem  # local: avoid import cost at module load
 
     remap: dict[str, str] = {}
+    occupied_ids = {
+        node.get("id")
+        for node in nodes
+        if isinstance(node, dict) and isinstance(node.get("id"), str)
+    }
     for node in nodes:
         if not isinstance(node, dict):
             continue
@@ -712,6 +717,13 @@ def _semantic_id_remap(nodes: list, root: str | None) -> dict:
                 entity = norm_nid[len(prefix):]
                 new_id = make_id(new_stem, entity)
                 break
+        # A canonical-looking id may already belong to a distinct node from the
+        # same file (for example a document anchor and a semantic concept). Do
+        # not silently collapse them through NetworkX's same-id overwrite. A
+        # genuine AST/semantic twin is still reconciled later by the guarded
+        # exact-(source_file, label) ghost merge.
+        if new_id in occupied_ids and new_id != nid:
+            continue
         if new_id and new_id != nid:
             remap[nid] = new_id
     return remap

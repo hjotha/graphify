@@ -81,3 +81,31 @@ def test_semantic_id_remap_still_migrates_genuine_legacy_id():
     a pre-scheme id under a normal path still remaps once to the canonical stem."""
     nodes = [{"id": "readme_booking", "source_file": "api/README.md", "_origin": "semantic"}]
     assert _semantic_id_remap(nodes, ".") == {"readme_booking": "api_readme_booking"}
+
+
+def test_semantic_id_remap_does_not_overwrite_distinct_occupied_id():
+    """A legacy-looking concept id must not collapse onto a distinct document
+    node that already owns the computed canonical id (#2505)."""
+    nodes = [
+        {
+            "id": "openwiki_architecture_learning_loop",
+            "label": "Learning Loop Architecture",
+            "file_type": "document",
+            "source_file": "openwiki/architecture/learning-loop.md",
+            "_origin": "semantic",
+        },
+        {
+            "id": "learning_loop",
+            "label": "Learning Loop",
+            "file_type": "concept",
+            "source_file": "openwiki/architecture/learning-loop.md",
+            "_origin": "semantic",
+        },
+    ]
+
+    assert _semantic_id_remap(nodes, ".") == {}
+    graph = build_from_json({"nodes": nodes, "edges": []}, root=".")
+    assert set(graph.nodes) == {
+        "openwiki_architecture_learning_loop",
+        "learning_loop",
+    }
