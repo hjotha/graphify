@@ -33,8 +33,16 @@ def _partition(G: nx.Graph, resolution: float = 1.0) -> dict[str, int]:
     """
     stable = nx.Graph()
     stable.add_nodes_from(sorted(G.nodes(), key=str))
-    edge_rows = sorted(
-        G.edges(data=True),
+    edge_rows = []
+    for src, tgt, attrs in G.edges(data=True):
+        # NetworkX subgraph views may expose an undirected edge in either
+        # orientation because their node filter is a set. Canonicalise it before
+        # sorting so Louvain/Leiden receive the same adjacency insertion order in
+        # fresh Python processes with different hash seeds.
+        if str(tgt) < str(src):
+            src, tgt = tgt, src
+        edge_rows.append((src, tgt, attrs))
+    edge_rows.sort(
         key=lambda row: (
             str(row[0]),
             str(row[1]),
