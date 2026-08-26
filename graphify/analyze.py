@@ -484,15 +484,17 @@ def suggest_questions(
         bridges = sorted(
             [(n, s) for n, s in betweenness.items()
              if not _is_file_node(G, n) and not _is_concept_node(G, n) and s > 0],
-            key=lambda x: x[1],
-            reverse=True,
+            key=lambda x: (-x[1], str(G.nodes[x[0]].get("label", x[0])), str(x[0])),
         )[:3]
         for node_id, score in bridges:
             label = G.nodes[node_id].get("label", node_id)
             cid = node_community.get(node_id)
             comm_label = community_labels.get(cid, f"Community {cid}") if cid is not None else "unknown"
             neighbors = list(G.neighbors(node_id))
-            neighbor_comms = {node_community.get(n) for n in neighbors if node_community.get(n) != cid}
+            neighbor_comms = sorted(
+                {node_community.get(n) for n in neighbors if node_community.get(n) != cid},
+                key=lambda c: (str(community_labels.get(c, f"Community {c}")), str(c)),
+            )
             if neighbor_comms:
                 other_labels = [community_labels.get(c, f"Community {c}") for c in neighbor_comms]
                 questions.append({
@@ -505,8 +507,7 @@ def suggest_questions(
     degree = dict(G.degree())
     top_nodes = sorted(
         [(n, d) for n, d in degree.items() if not _is_file_node(G, n)],
-        key=lambda x: x[1],
-        reverse=True,
+        key=lambda x: (-x[1], str(G.nodes[x[0]].get("label", x[0])), str(x[0])),
     )[:5]
     for node_id, _ in top_nodes:
         inferred = [

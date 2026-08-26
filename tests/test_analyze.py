@@ -655,6 +655,24 @@ def test_suggest_questions_excludes_rationale_nodes_from_isolated_count():
     assert "Explains service" not in isolated["question"]
 
 
+def test_suggest_questions_orders_bridge_communities_deterministically():
+    G = nx.Graph()
+    G.add_node("bridge", label="BridgeNode", source_file="src/bridge_impl.py", file_type="code")
+    G.add_node("left", label="LeftEntity", source_file="src/left_impl.py", file_type="code")
+    G.add_node("right", label="RightEntity", source_file="src/right_impl.py", file_type="code")
+    G.add_edges_from([("bridge", "left"), ("bridge", "right")])
+
+    questions = suggest_questions(
+        G,
+        communities={0: ["bridge"], 1: ["left"], 2: ["right"]},
+        community_labels={0: "Bridge", 1: "Zulu", 2: "Alpha"},
+        top_n=1,
+    )
+
+    assert questions[0]["type"] == "bridge_node"
+    assert "`Alpha`, `Zulu`" in questions[0]["question"]
+
+
 # ── find_import_cycles tests ──────────────────────────────────────────────────
 
 
