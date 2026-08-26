@@ -328,9 +328,23 @@ def remap_communities_to_previous(
     return dict(sorted(remapped.items(), key=lambda kv: kv[0]))
 
 
-_INCREMENTAL_NODE_IGNORED_ATTRS = {"id", "community", "x", "y"}
+_INCREMENTAL_NODE_IGNORED_ATTRS = {
+    "id",
+    "community",
+    "community_name",
+    "norm_label",
+    "x",
+    "y",
+}
 _INCREMENTAL_EDGE_IGNORED_ATTRS = {
-    "source", "target", "_src", "_tgt", "community", "x", "y",
+    "source",
+    "target",
+    "_src",
+    "_tgt",
+    "community",
+    "confidence_score",
+    "x",
+    "y",
 }
 
 

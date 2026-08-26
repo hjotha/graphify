@@ -181,3 +181,32 @@ def test_stable_incremental_communities_preserves_untouched_community():
     assert seen == [{"a", "b", "c"}]
     assert communities[9] == ["x", "y"]
     assert set(communities[4]) == {"a", "b", "c"}
+
+
+def test_stable_incremental_communities_ignores_export_only_attrs():
+    old = nx.Graph()
+    old.add_edge("a", "b", confidence="EXTRACTED", confidence_score=1.0)
+    old.add_edge("x", "y", confidence="EXTRACTED", confidence_score=1.0)
+    for node in old.nodes:
+        old.nodes[node]["label"] = node.upper()
+        old.nodes[node]["community_name"] = "Saved label"
+        old.nodes[node]["norm_label"] = node
+
+    new = nx.Graph()
+    new.add_edge("a", "b", confidence="EXTRACTED")
+    new.add_edge("x", "y", confidence="EXTRACTED")
+    for node in new.nodes:
+        old_node = old.nodes[node]
+        new.nodes[node]["label"] = old_node["label"]
+
+    def should_not_recluster(_graph):
+        raise AssertionError("export-only attrs must not trigger reclustering")
+
+    communities = stable_incremental_communities(
+        old,
+        new,
+        {"a": 4, "b": 4, "x": 9, "y": 9},
+        cluster_fn=should_not_recluster,
+    )
+
+    assert communities == {4: ["a", "b"], 9: ["x", "y"]}
