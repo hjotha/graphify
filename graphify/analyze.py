@@ -476,21 +476,35 @@ def suggest_questions(
                 "why": f"Edge tagged AMBIGUOUS (relation: {relation}) - confidence is low.",
             })
 
-    # 2. Bridge nodes (high betweenness) → cross-cutting concern questions
+    # 2. Bridge nodes (cross-community connectivity) → cross-cutting concern questions.
+    # A sampled betweenness calculation made reports vary between Python
+    # processes even with a fixed seed because graph iteration order is not part
+    # of its contract. Count cross-community neighbours instead: it is cheap,
+    # deterministic, and measures the property this question exposes.
     if G.number_of_edges() > 0:
-        k = min(100, G.number_of_nodes()) if G.number_of_nodes() > 1000 else None
-        betweenness = nx.betweenness_centrality(G, k=k, seed=42)
-        # Top bridge nodes that are NOT file-level hubs
+        bridge_scores = []
+        for node_id in sorted(G.nodes(), key=str):
+            if _is_file_node(G, node_id) or _is_concept_node(G, node_id):
+                continue
+            cid = node_community.get(node_id)
+            if cid is None:
+                continue
+            cross_neighbors = [
+                neighbor for neighbor in G.neighbors(node_id)
+                if node_community.get(neighbor) is not None
+                and node_community.get(neighbor) != cid
+            ]
+            if cross_neighbors:
+                bridge_scores.append((node_id, len(cross_neighbors)))
         bridges = sorted(
-            [(n, s) for n, s in betweenness.items()
-             if not _is_file_node(G, n) and not _is_concept_node(G, n) and s > 0],
+            bridge_scores,
             key=lambda x: (-x[1], str(G.nodes[x[0]].get("label", x[0])), str(x[0])),
         )[:3]
         for node_id, score in bridges:
             label = G.nodes[node_id].get("label", node_id)
             cid = node_community.get(node_id)
             comm_label = community_labels.get(cid, f"Community {cid}") if cid is not None else "unknown"
-            neighbors = list(G.neighbors(node_id))
+            neighbors = sorted(G.neighbors(node_id), key=str)
             neighbor_comms = sorted(
                 {node_community.get(n) for n in neighbors if node_community.get(n) != cid},
                 key=lambda c: (str(community_labels.get(c, f"Community {c}")), str(c)),
@@ -500,7 +514,7 @@ def suggest_questions(
                 questions.append({
                     "type": "bridge_node",
                     "question": f"Why does `{label}` connect `{comm_label}` to {', '.join(f'`{l}`' for l in other_labels)}?",
-                    "why": f"High betweenness centrality ({score:.3f}) - this node is a cross-community bridge.",
+                    "why": f"Cross-community connectivity ({score} edge(s)) - this node is a cross-community bridge.",
                 })
 
     # 3. God nodes with many INFERRED edges → verification questions

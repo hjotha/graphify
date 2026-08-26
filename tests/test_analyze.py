@@ -671,6 +671,7 @@ def test_suggest_questions_orders_bridge_communities_deterministically():
 
     assert questions[0]["type"] == "bridge_node"
     assert "`Alpha`, `Zulu`" in questions[0]["question"]
+    assert "Cross-community connectivity (2 edge(s))" in questions[0]["why"]
 
 
 # ── find_import_cycles tests ──────────────────────────────────────────────────
